@@ -1,0 +1,4 @@
+doc/
+.vscode
+.Rproj**
+.DS_Store
