@@ -2,3 +2,5 @@ doc/
 .vscode
 .Rproj**
 .DS_Store
+.Rproj.user
+__pycache__
