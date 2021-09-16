@@ -26,11 +26,11 @@ Di dalam direktori ini juga sudah disediakan file `Dockerfile` yang digunakan un
 
 1. Install Docker
 2. Jalankan `docker build -t bpjsai .` untuk menginstall semua perangkat yang dibutuhkan menggunakan Docker
-3. Jalankan `docker run -it bpjsai` untuk menjalankan Docker
+3. Jalankan `docker run -it bpjsai` untuk memulai Docker dan jalankan script Python di atas via Docker
 
 ## Ceklis Pengembangan Model
 
 - [x] Percobaan model pertama menggunakan LightGBM untuk prediksi kasus dan biaya 
-- [ ] Menggunakan Docker dan membuat dokumentasi ringkas tentang penggunaan kode
-- [ ] Percobaan model kedua dengan optimasi MAPE untuk prediksi kasus
-- [ ] Kapan pencilan muncul? Apakah secara acak atau tidak?
+- [x] Menggunakan Docker dan membuat dokumentasi ringkas tentang penggunaan kode
+- [x] Percobaan model kedua dengan optimasi MAPE untuk prediksi kasus
+- [x] Percobaan model ketiga dengan menggunakan model pertama dengan koreksi nilai pencilan

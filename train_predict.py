@@ -46,14 +46,7 @@ df = df.drop(columns=['tglpelayanan_lag_1','tglpelayanan_lag_-1'])
 # Create folds
 df = create_folds(df, cv_split=5, seed=SEED)
 
-# Fill NA with lag/lead
-nlag_features = [col for col in df.columns if 'lag_1' in col]
-nlead_features = [col for col in df.columns if 'lag_-1' in col]
-df[nlag_features] = df.groupby(['id'])[nlag_features].bfill()
-df[nlead_features] = df.groupby(['id'])[nlead_features].ffill()
 
-
-# Model
 def process_train_lgb(
     df,
     target=TARGET[0],
@@ -138,10 +131,11 @@ lgb_params = {'boosting_type': 'gbdt',
               'num_leaves': 255,            
               'min_data_in_leaf': 255, 
               'feature_fraction': 0.9,
-              'n_estimators': 1000,   
-              'early_stopping_rounds': 100,
-              'seed': 20000,
+              'n_estimators': 40,
+              'seed': SEED,
               'verbose': -1}
+
+df_fill = df.copy()
 
 case_mdl, case_test_df = process_train_lgb(
     df,
@@ -149,12 +143,21 @@ case_mdl, case_test_df = process_train_lgb(
     validation=False
 )
 
+# Adjust prediction on 2021-06-01 as outlier
+case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01', 'predict_case'] = 1
+
+case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01']
+
+nlag_features = [col for col in df.columns if 'lag_1' in col]
+nlead_features = [col for col in df.columns if 'lag_-1' in col]
+df[nlag_features] = df.groupby(['id'])[nlag_features].bfill()
+df[nlead_features] = df.groupby(['id'])[nlead_features].ffill()
+
 cost_test_df = df[df['cat'] == 'Test'][['row_id','unit_cost_lag_-1','unit_cost_lag_1']].copy()
 cost_test_df['predict_unit_cost'] = (cost_test_df['unit_cost_lag_-1'] + cost_test_df['unit_cost_lag_1']) / 2
 cost_test_df = cost_test_df.drop(['unit_cost_lag_-1','unit_cost_lag_1'], axis=1)
 
 sub = pd.concat([case_test_df[['row_id','predict_case']], cost_test_df[['predict_unit_cost']]], axis=1).sort_values('row_id')
-sub.to_csv('submission/tahap2_case_cost_prediction_V2.csv', index=False)
+sub.to_csv('submission/tahap3_case_cost_prediction.csv', index=False)
 
 case_mdl.save_model('submission/tahap2_case_model_V2.mdl')
-

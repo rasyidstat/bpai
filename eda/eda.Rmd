@@ -87,7 +87,12 @@ df_case_all <- df_case_all %>%
   mutate(comb_sum = a+b+c+cb+d+ds+gd+hd+i1+i2+i3+i4+kb+kc+kg+ki+kj+kk+kl+km+ko+kp+kt+ku+s+sa+sb+sc+sd)
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r chekerr, eval=FALSE, include=FALSE}
+df_case_all %>% 
+  filter(kddati2 == 32) %>% 
+  select(tglpelayanan, kddati2, tkp, case) %>% 
+  View()
+
 df_kd %>% 
   group_by(kddati2, tkp) %>% 
   summarise(cnt = n(),
@@ -223,7 +228,6 @@ df_case_all %>%
   count(kddati2, tglpelayanan, peserta) %>% 
   filter(n != 2)
 ```
-
 ### General
 
 How many dates?
@@ -289,6 +293,33 @@ df_case_all %>%
   geom_col() +
   theme_minimal()
 ```
+
+```{r train-test-ratio, eval=FALSE, include=FALSE}
+df_case_all %>% 
+  # filter(tkp == 30) %>%
+  group_by(tglpelayanan, cat) %>% 
+  summarise(cnt = n()) %>% 
+  ungroup() %>% 
+  spread(cat, cnt) %>% 
+  mutate(test_ratio = Test / (Test + Train)) %>% 
+  View()
+```
+
+
+```{r}
+df_case_all %>% 
+  # filter(tkp == 30) %>%
+  group_by(tglpelayanan, cat) %>% 
+  summarise(cnt = n()) %>% 
+  ungroup() %>% 
+  group_by(tglpelayanan) %>% 
+  mutate(p = cnt / sum(cnt)) %>% 
+  filter(cat == "Test") %>% 
+  ggplot(aes(tglpelayanan, p, fill = cat)) +
+  geom_line() +
+  theme_minimal()
+```
+
 
 ### Monthly Seasonality
 
@@ -390,10 +421,62 @@ df_case_wider %>%
 
 ```{r}
 # MAPE >= 200%?
-df_case %>% 
-  mutate(case_mean = mean(case),
-         case_sd = sd(case))
+df_case_all <- df_case_all %>% 
+  group_by(kddati2, tkp) %>% 
+  mutate(case_mean = mean(case, na.rm = TRUE),
+         case_sd = sd(case, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(is_outlier = (case >= case_mean + 2 * case_sd) | (case <= case_mean - 2 * case_sd),
+         is_lower_outlier = (case <= case_mean - 2 * case_sd),
+         is_upper_outlier = (case >= case_mean + 2 * case_sd))
+
+df_case_all %>% 
+  filter(!is.na(is_lower_outlier)) %>% 
+  count(is_lower_outlier, is_upper_outlier) %>% 
+  mutate(pct = n / sum(n) * 100)
 ```
+
+```{r}
+df_case_all %>% 
+  filter(!is.na(is_lower_outlier)) %>% 
+  group_by(tglpelayanan, is_outlier) %>% 
+  summarise(cnt = n()) %>% 
+  ggplot(aes(tglpelayanan, cnt, fill = is_outlier)) +
+  geom_col() +
+  theme_minimal()
+```
+
+```{r}
+df_case_all %>% 
+  filter(!is.na(is_lower_outlier)) %>% 
+  group_by(tglpelayanan, is_outlier) %>% 
+  summarise(cnt = n()) %>% 
+  ungroup() %>% 
+  group_by(tglpelayanan) %>% 
+  mutate(p = cnt / sum(cnt)) %>% 
+  ungroup() %>% 
+  filter(is_outlier) %>% 
+  ggplot(aes(tglpelayanan, p)) +
+  geom_line() +
+  theme_minimal()
+```
+
+```{r outlier-comparison}
+df_case_all <- df_case_all %>% 
+  group_by(kddati2, tkp) %>% 
+  mutate(p_mean = mean(peserta, na.rm = TRUE),
+         p_sd = sd(peserta, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(is_outlier = (peserta >= p_mean + 2 * p_sd) | (peserta <= p_mean - 2 * p_sd),
+         is_lower_outlier = (peserta <= p_mean - 2 * p_sd),
+         is_upper_outlier = (peserta >= p_mean + 2 * p_sd))
+
+df_case_all %>% 
+  count(cat, is_lower_outlier, is_upper_outlier) %>% 
+  group_by(cat) %>% 
+  mutate(pct = n / sum(n) * 100)
+```
+
 
 ### Visualize for Each KD
 
@@ -483,15 +566,17 @@ cat("MAE Case", mae(df_pred$case, df_pred$predict_case), "\n")
 Lead
 
 ```{r}
-df_pred <- df_case %>% 
+df_pred <- df_case_all %>% 
   group_by(kddati2, tkp) %>% 
   mutate(predict_case = lead(case),
          predict_unit_cost = lead(unit_cost)) %>% 
+  fill(predict_case, predict_unit_cost, .direction = c("down")) %>% 
   ungroup() %>% 
-  select(tglpelayanan, row_id, case, predict_case, unit_cost, predict_unit_cost) %>% 
-  filter(!is.na(predict_case), !is.na(predict_unit_cost))
+  select(tglpelayanan, row_id, case, predict_case, unit_cost, predict_unit_cost, cat) %>% 
+  filter(!is.na(predict_case), !is.na(predict_unit_cost), cat == "Train")
 
 # MAPE
+nrow(df_pred)
 cat("MAPE Cost", mape(df_pred$unit_cost, df_pred$predict_unit_cost), "\n")
 cat("MAPE Case", mape(df_pred$case, df_pred$predict_case), "\n")
 
@@ -503,7 +588,7 @@ cat("MAE Case", mae(df_pred$case, df_pred$predict_case), "\n")
 Use data test too
 
 ```{r}
-df_pred <- df_case_all %>% 
+df_pred2 <- df_case_all %>% 
   group_by(kddati2, tkp) %>% 
   mutate(predict_case = (coalesce(lag(case), lead(case)) + coalesce(lead(case), lag(case))) / 2,
          predict_unit_cost = (coalesce(lag(unit_cost), lead(unit_cost)) + coalesce(lead(unit_cost), lag(unit_cost))) / 2) %>% 
@@ -512,12 +597,13 @@ df_pred <- df_case_all %>%
   filter(!is.na(predict_case), !is.na(predict_unit_cost), cat == "Train")
 
 # MAPE
-cat("MAPE Cost", mape(df_pred$unit_cost, df_pred$predict_unit_cost), "\n")
-cat("MAPE Case", mape(df_pred$case, df_pred$predict_case), "\n")
+nrow(df_pred2)
+cat("MAPE Cost", mape(df_pred2$unit_cost, df_pred2$predict_unit_cost), "\n")
+cat("MAPE Case", mape(df_pred2$case, df_pred2$predict_case), "\n")
 
 # MAE
-cat("MAE Cost", mae(df_pred$unit_cost, df_pred$predict_unit_cost), "\n")
-cat("MAE Case", mae(df_pred$case, df_pred$predict_case), "\n")
+cat("MAE Cost", mae(df_pred2$unit_cost, df_pred2$predict_unit_cost), "\n")
+cat("MAE Case", mae(df_pred2$case, df_pred2$predict_case), "\n")
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -538,9 +624,15 @@ df_pred <- df_case_all %>%
 ```
 
 ```{r}
-df_pred <- df_pred %>% 
-  mutate(pe = abs( (unit_cost - predict_unit_cost) / unit_cost ) )
-df_pred %>% 
+df_pred_all <- df_pred %>% 
+  mutate(pe = abs( (case - predict_case) / case ) ) %>% 
+  left_join(
+    df_pred2 %>% 
+      mutate(pe2 = abs( (case - predict_case) / case ) ) %>% 
+      rename(predict_case2 = predict_case, predict_unit_cost2 = predict_unit_cost) %>% 
+      select(-case, -unit_cost)
+  )
+df_pred_all %>% 
   summary()
 ```
 
@@ -630,6 +722,9 @@ viz_kd <- function(id) {
 }
 viz_kd(5)
 ```
+```{r}
+viz_kd(202)
+```
 
 ```{r}
 submission <- read.csv("../submission/tahap2_case_cost_prediction_V2.csv") %>% 
@@ -645,6 +740,17 @@ df_case_final %>%
 ```
 
 ```{r}
+viz_kd(306)
+```
+
+```{r}
+viz_kd(300)
+```
+```{r}
+viz_kd(50)
+```
+
+```{r}
 viz_kd(5)
 ```
 ```{r eval=FALSE, include=FALSE}
@@ -652,6 +758,17 @@ df_case_final %>%
   filter(cat == "Test") %>% 
   filter(tglpelayanan == ymd(20210601)) %>% 
   select(predict_case)
+```
+
+### Check Median
+
+```{r}
+df_case %>% 
+  group_by(tglpelayanan) %>% 
+  summarise(case_min = min(case),
+            case_max = max(case),
+            case_median = median(case),
+            case_avg = mean(case))
 ```
 
 ---
