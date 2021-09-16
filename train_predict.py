@@ -33,7 +33,6 @@ FOLD = 5
 # Preprocessing
 df = read_data(dir='data')
 df['id'] = df['kddati2'].astype(str) + '-' + df['tkp'].astype(str)
-df['rs_total'] = df[rs_features].sum(axis=1)
 
 # Features engineering
 df = generate_date_features(df)
@@ -131,22 +130,25 @@ lgb_params = {'boosting_type': 'gbdt',
               'num_leaves': 255,            
               'min_data_in_leaf': 255, 
               'feature_fraction': 0.9,
-              'n_estimators': 40,
+              'n_estimators': 35,
               'seed': SEED,
               'verbose': -1}
 
 df_fill = df.copy()
+df_fill[['case_lag_1','unit_cost_lag_1']] = df_fill.groupby(['id'])[['case_lag_1','unit_cost_lag_1']].bfill()
+df_fill[['case_lag_-1']] = df_fill[['case_lag_-1']].fillna(1)
+df_fill = df_fill.fillna(-1)
+df_fill['rs_total'] = df_fill[rs_features].sum(axis=1)
 
 case_mdl, case_test_df = process_train_lgb(
-    df,
+    df_fill,
     remove_additional_features=rs_features,
     validation=False
 )
 
-# Adjust prediction on 2021-06-01 as outlier
-case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01', 'predict_case'] = 1
-
-case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01']
+# Adjust prediction on 2021-06-01 as outlier (not needed)
+# case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01', 'predict_case'] = 1
+# case_test_df.loc[case_test_df['tglpelayanan'] == '2021-06-01']
 
 nlag_features = [col for col in df.columns if 'lag_1' in col]
 nlead_features = [col for col in df.columns if 'lag_-1' in col]
@@ -158,6 +160,6 @@ cost_test_df['predict_unit_cost'] = (cost_test_df['unit_cost_lag_-1'] + cost_tes
 cost_test_df = cost_test_df.drop(['unit_cost_lag_-1','unit_cost_lag_1'], axis=1)
 
 sub = pd.concat([case_test_df[['row_id','predict_case']], cost_test_df[['predict_unit_cost']]], axis=1).sort_values('row_id')
-sub.to_csv('submission/tahap3_case_cost_prediction.csv', index=False)
+sub.to_csv('submission/FINAL_case_cost_prediction.csv', index=False)
 
 case_mdl.save_model('submission/tahap2_case_model_V2.mdl')

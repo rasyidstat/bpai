@@ -727,7 +727,7 @@ viz_kd(202)
 ```
 
 ```{r}
-submission <- read.csv("../submission/tahap2_case_cost_prediction_V2.csv") %>% 
+submission <- read.csv("../submission/FINAL_case_cost_prediction.csv") %>% 
   mutate(cat = "Test")
 df_case_final <- df_case_all %>% 
   left_join(submission) %>% 
