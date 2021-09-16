@@ -20,13 +20,13 @@ Berikut ini tahapan yang perlu dilakukan untuk menghasilkan model dan prediksi:
 
 1. Install Python sesuai dengan versi yang disebutkan di atas
 2. Jalankan `pip install -r requirements.txt` untuk menginstall library yang dibutuhkan
-3. Jalankan `python baseline.py` untuk menghasilkan prediksi
+3. Jalankan `python train_predict.py` untuk menghasilkan model dan prediksi
 
 Di dalam direktori ini juga sudah disediakan file `Dockerfile` yang digunakan untuk menjalankan Docker sehingga kode dapat dijalankan di environment mana pun baik Windows, Mac maupun Linux dan hasilnya dipastikan sama persis. 
 
 1. Install Docker
 2. Jalankan `docker build -t bpjsai .` untuk menginstall semua perangkat yang dibutuhkan menggunakan Docker
-3. Jalankan `docker run -it bpjsai` untuk menghasilkan prediksi
+3. Jalankan `docker run -it bpjsai` untuk menjalankan Docker
 
 ## Ceklis Pengembangan Model
 
